@@ -1,0 +1,7 @@
+.env
+/vendor
+/bot/medias
+*.idea
+cookies.txt
+/bot/cookies
+/medias

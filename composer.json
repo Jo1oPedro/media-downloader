@@ -1,0 +1,23 @@
+{
+    "name": "jpppe/discord-bot",
+    "autoload": {
+        "psr-4": {
+            "App\\DiscordBot\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "cascata"
+        }
+    ],
+    "require": {
+        "team-reflex/discord-php": "^10.18",
+        "vlucas/phpdotenv": "^5.6",
+        "norkunas/youtube-dl-php": "dev-master",
+        "aws/aws-sdk-php": "^3.337",
+        "php-amqplib/php-amqplib": "^3.7"
+    },
+    "require-dev": {
+        "symfony/var-dumper": "^7.3"
+    }
+}

@@ -1,0 +1,45 @@
+services:
+  discord-bot:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        PHP_VERSION: '8.4.11-bullseye'
+      target: "${BUILD_TARGET:-app}"
+    container_name: discord-bot
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./:/var/www/app
+    #command: ["php", "/var/www/app/index.php"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+    networks:
+      - my-shared-network
+
+  discord-bot-queue-consume:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        PHP_VERSION: '8.4.11-bullseye'
+      target: "${BUILD_TARGET:-app}"
+    container_name: discord-bot-queue-consume
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./:/var/www/app
+    depends_on:
+      - discord-bot
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+    networks:
+      - my-shared-network
+
+networks:
+  my-shared-network:
+    driver: bridge
