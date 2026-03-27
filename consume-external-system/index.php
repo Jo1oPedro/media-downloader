@@ -75,7 +75,7 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
 
     $url = (string) $request->getUri();
 
-    $endpoint = $_ENV["EXTERNAL_API_DOMAIN"] . "/api/media/{$data['media_id']}/status";
+    $endpoint = $_ENV["EXTERNAL_API_DOMAIN"] . "/api/media/{$data['media_id']}";
 
     $payload = json_encode([
         "media_id" => $data["media_id"],
