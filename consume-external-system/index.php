@@ -50,7 +50,7 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
 
     $file = $youtubeDl->download($downloadCommand);
     $name = md5(uniqid());
-    $key = "uploads/{$data['format']}/{$name}";
+    $key = "uploads/{$data['format']}/{$name}.{$data['format']}";
 
     try {
         $s3->putObject([
@@ -68,7 +68,7 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
     $cmd = $s3->getCommand('GetObject', [
         "Bucket" => $_ENV['AWS_BUCKET'],
         "Key" => $key,
-        "ResponseContentDisposition" => 'attachment; filename="' . $data['format'] . '-' . $name . '"'
+        "ResponseContentDisposition" => 'attachment; filename="' . $data['format'] . '-' . $name .  '.' . $data['format'] .'"'
     ]);
 
     $request = $s3->createPresignedRequest($cmd, '+30 minutes');
