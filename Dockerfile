@@ -20,6 +20,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     curl \
+    supervisor \
   && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install \
@@ -58,6 +59,10 @@ RUN rm -rf vendor \
  && composer update --no-interaction \
 
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 
 FROM app AS app_dev
 
