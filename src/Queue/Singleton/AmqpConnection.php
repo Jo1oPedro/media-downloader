@@ -19,6 +19,7 @@ class AmqpConnection
             $amqpConfig->setPort($_ENV['QUEUE_PORT']);
             $amqpConfig->setUser($_ENV['QUEUE_USER']);
             $amqpConfig->setPassword($_ENV['QUEUE_PASSWORD']);
+            $amqpConfig->setIsSecure(true);
 
             self::$instance = AMQPConnectionFactory::create($amqpConfig);
         }
