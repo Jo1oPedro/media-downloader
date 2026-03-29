@@ -59,7 +59,7 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
             "Body" => fopen($file["path"], "rb"),
             "ACL" => "public-read",
         ]);
-    } catch (S3Exception $exception) {
+    } catch (Throwable|S3Exception $exception) {
         $message->ack();
         unlink($file["path"]);
         return;
