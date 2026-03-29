@@ -15,6 +15,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     libpq-dev \
     libxml2-dev \
     libbrotli-dev \
+    libssl-dev \
     ffmpeg \
     python3 \
     python3-pip \
@@ -37,10 +38,10 @@ RUN docker-php-ext-install \
 
 RUN pecl install redis \
  && docker-php-ext-enable redis \
- && pecl install swoole \
+ && yes '' | pecl install swoole \
  && docker-php-ext-enable swoole
 
-RUN pip3 install --no-cache-dir yt-dlp
+RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
 
 RUN curl -sS https://getcomposer.org/installer | php \
     -- --install-dir=/usr/local/bin --filename=composer

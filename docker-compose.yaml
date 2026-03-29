@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
       args:
-        PHP_VERSION: '8.4.11-bullseye'
+        PHP_VERSION: '8.4-bookworm'
       target: "${BUILD_TARGET:-app}"
     container_name: discord-bot
     tty: true
@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
       args:
-        PHP_VERSION: '8.4.11-bullseye'
+        PHP_VERSION: '8.4-bookworm'
       target: "${BUILD_TARGET:-app}"
     container_name: discord-bot-queue-consume
     tty: true

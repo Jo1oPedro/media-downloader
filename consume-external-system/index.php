@@ -48,7 +48,36 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
         format: $data["format"]
     );
 
-    $file = $youtubeDl->download($downloadCommand);
+    try {
+        $file = $youtubeDl->download($downloadCommand);
+    } catch (\RuntimeException $e) {
+        echo "Download failed: " . $e->getMessage() . "\n";
+
+        $endpoint = $_ENV["EXTERNAL_API_DOMAIN"] . "/api/media/{$data['media_id']}";
+        $payload = json_encode([
+            "media_id" => $data["media_id"],
+            "url" => null,
+            "status" => "failed"
+        ]);
+
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Content-type: application/json",
+            "Content-Length: " . strlen($payload),
+            "Authorization: Bearer " . $_ENV['EXTERNAL_API_TOKEN']
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+
+        $message->ack();
+        return;
+    }
+
     $name = md5(uniqid());
     $key = "uploads/{$data['format']}/{$name}.{$data['format']}";
 

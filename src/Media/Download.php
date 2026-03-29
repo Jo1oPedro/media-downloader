@@ -52,7 +52,18 @@ class Download
 
         $collection = $this->youtubeDl->download($options);
 
-        $firstVideo = $collection->getVideos()[0];
+        $videos = $collection->getVideos();
+
+        if (empty($videos) || $videos[0]->getError() !== null) {
+            $error = !empty($videos) ? $videos[0]->getError() : 'No videos returned';
+            throw new \RuntimeException("Download failed: {$error}");
+        }
+
+        $firstVideo = $videos[0];
+
+        if ($firstVideo->getFileName() === null || !file_exists($firstVideo->getFileName())) {
+            throw new \RuntimeException("Download failed: file not found");
+        }
 
         $sizeBytes = filesize($firstVideo->getFileName());
 
