@@ -52,6 +52,8 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
     $name = md5(uniqid());
     $key = "uploads/{$data['format']}/{$name}.{$data['format']}";
 
+    echo "Download completed. Uploading to S3: {$key}\n";
+
     try {
         $s3->putObject([
             "Bucket" => $_ENV['AWS_BUCKET'],
@@ -60,6 +62,7 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
             "ACL" => "public-read",
         ]);
     } catch (Throwable|S3Exception $exception) {
+        echo "S3 upload failed: " . $exception->getMessage() . "\n";
         $message->ack();
         unlink($file["path"]);
         return;
@@ -86,11 +89,15 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
     $message->ack();
     unlink($file["path"]);
 
+    echo "Uploading to S3 completed. Sending PATCH to: {$endpoint}\n";
+
     $ch = curl_init($endpoint);
 
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "Content-type: application/json",
         "Content-Length: " . strlen($payload),
