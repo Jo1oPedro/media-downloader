@@ -2,6 +2,8 @@ ARG PHP_VERSION
 FROM php:${PHP_VERSION} AS app
 
 ARG APP_DIR=/var/www/app
+ARG APP_ENV=local
+ENV APP_ENV=${APP_ENV}
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     git \
@@ -61,6 +63,11 @@ RUN rm -rf vendor \
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN rm -rf vendor \
+    && composer install --prefer-dist --no-scripts --no-progress --no-interaction \
+    $(if [ "$APP_ENV" = "production" ]; then echo "--no-dev"; fi) \
+    && composer dump-autoload --optimize
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 
