@@ -44,6 +44,10 @@ RUN pecl install redis \
  && yes '' | pecl install swoole \
  && docker-php-ext-enable swoole
 
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
 
 RUN curl -sS https://getcomposer.org/installer | php \
