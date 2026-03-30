@@ -48,7 +48,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
  && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
+RUN pip3 install --no-cache-dir --break-system-packages "yt-dlp[default]" \
+ && pip3 install --no-cache-dir --break-system-packages bgutil-ytdlp-pot-provider
 
 COPY yt-dlp.conf /etc/yt-dlp.conf
 
