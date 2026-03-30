@@ -50,6 +50,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 
 RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
 
+COPY yt-dlp.conf /etc/yt-dlp.conf
+
 RUN curl -sS https://getcomposer.org/installer | php \
     -- --install-dir=/usr/local/bin --filename=composer
 
