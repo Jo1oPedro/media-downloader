@@ -17,7 +17,7 @@ class YtDlpProcessBuilder implements ProcessBuilderInterface
 
     public function build(?string $binPath, ?string $pythonPath, array $arguments = []): Process
     {
-        array_unshift($arguments, '--js-runtimes=nodejs');
+        array_unshift($arguments, '--js-runtimes=node');
 
         return $this->inner->build($binPath, $pythonPath, $arguments);
     }
