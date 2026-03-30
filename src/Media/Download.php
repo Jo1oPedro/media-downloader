@@ -15,8 +15,7 @@ class Download
     public function __construct(
         string $binPath = ""
     ) {
-        $this->youtubeDl = new YoutubeDl();
-        //$this->youtubeDl->setBinPath($binPath);
+        $this->youtubeDl = new YoutubeDl(new YtDlpProcessBuilder());
         $this->youtubeDl->debug(function (string $type, string $buffer): void {
             // $type will be either Process::OUT or Process::ERR
             echo strtoupper($type) . ': ' . $buffer;
