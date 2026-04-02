@@ -73,12 +73,13 @@ $discord->on('ready', function(Discord $discord) use($youtubeDl, $s3) {
                 "ACL" => "public-read",
             ]);
         } catch (S3Exception $exception) {
-            file_put_contents("dale.txt", print_r($exception->getMessage(), true));
-            $discordChannel->sendMessage("❌ Ocorreu um erro ao realizar o seu download: <@{$data['author_id']}>")
-                ->then(function() use ($message, $file) {
+            $message->ack();
+            unlink($file["path"]);
+            $discordChannel->sendMessage("❌ Ocorreu um erro ao realizar o seu download: <@{$data['author_id']}>");
+                /*->then(function() use ($message, $file) {
                     $message->ack();
                     unlink($file["path"]);
-                });
+                });*/
             return;
         }
 
