@@ -1,14 +1,12 @@
 <?php
 
 use App\DiscordBot\Commands\DownloadCommand;
+use App\DiscordBot\Http\ExternalApiClient;
 use App\DiscordBot\Media\Download;
 use App\DiscordBot\Queue\Singleton\AmqpConnection;
+use App\DiscordBot\Storage\S3Uploader;
 use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
-use Discord\Builders\MessageBuilder;
-use Discord\Discord;
-use Discord\Parts\User\User;
-use Discord\WebSockets\Intents;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
 
@@ -20,7 +18,8 @@ $dotEnv->load();
 $config = require_once __DIR__ . "/../config.php";
 
 $youtubeDl = new Download();
-$s3 = new S3Client($config["aws"]);
+$s3Uploader = new S3Uploader(new S3Client($config["aws"]), $_ENV['AWS_BUCKET']);
+$apiClient = new ExternalApiClient($_ENV['EXTERNAL_API_DOMAIN'], $_ENV['EXTERNAL_API_TOKEN']);
 
 $ampqConnection = AmqpConnection::getInstance();
 
@@ -34,7 +33,7 @@ $channel->queue_declare(
     false
 );
 
-$callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
+$callback = function (AMQPMessage $message) use ($youtubeDl, $s3Uploader, $apiClient) {
     $data = json_decode($message->getBody(),true);
 
     if(!$data) {
@@ -53,26 +52,11 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
     } catch (\RuntimeException $e) {
         echo "Download failed: " . $e->getMessage() . "\n";
 
-        $endpoint = $_ENV["EXTERNAL_API_DOMAIN"] . "/api/media/{$data['media_id']}";
-        $payload = json_encode([
+        $apiClient->patch("/api/media/{$data['media_id']}", [
             "media_id" => $data["media_id"],
             "url" => null,
             "status" => "failed"
         ]);
-
-        $ch = curl_init($endpoint);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-type: application/json",
-            "Content-Length: " . strlen($payload),
-            "Authorization: Bearer " . $_ENV['EXTERNAL_API_TOKEN']
-        ]);
-        curl_exec($ch);
-        curl_close($ch);
 
         $message->ack();
         return;
@@ -84,64 +68,28 @@ $callback = function (AMQPMessage $message) use ($youtubeDl, $s3) {
     echo "Download completed. Uploading to S3: {$key}\n";
 
     try {
-        $s3->putObject([
-            "Bucket" => $_ENV['AWS_BUCKET'],
-            "Key" => $key,
-            "Body" => fopen($file["path"], "rb"),
-            "ACL" => "public-read",
-        ]);
-    } catch (Throwable|S3Exception $exception) {
+        $s3Uploader->upload($key, $file["path"]);
+    } catch (\Throwable|S3Exception $exception) {
         echo "S3 upload failed: " . $exception->getMessage() . "\n";
         $message->ack();
         unlink($file["path"]);
         return;
     }
 
-    $cmd = $s3->getCommand('GetObject', [
-        "Bucket" => $_ENV['AWS_BUCKET'],
-        "Key" => $key,
+    $url = $s3Uploader->getPresignedUrl($key, '+30 minutes', [
         "ResponseContentDisposition" => 'attachment; filename="' . $data['format'] . '-' . $name .  '.' . $data['format'] .'"'
-    ]);
-
-    $request = $s3->createPresignedRequest($cmd, '+30 minutes');
-
-    $url = (string) $request->getUri();
-
-    $endpoint = $_ENV["EXTERNAL_API_DOMAIN"] . "/api/media/{$data['media_id']}";
-
-    $payload = json_encode([
-        "media_id" => $data["media_id"],
-        "url" => $url,
-        "status" => "success"
     ]);
 
     $message->ack();
     unlink($file["path"]);
 
-    echo "Uploading to S3 completed. Sending PATCH to: {$endpoint}\n";
+    echo "Uploading to S3 completed. Sending PATCH to API\n";
 
-    $ch = curl_init($endpoint);
-
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Content-type: application/json",
-        "Content-Length: " . strlen($payload),
-        "Authorization: Bearer " . $_ENV['EXTERNAL_API_TOKEN']
+    $apiClient->patch("/api/media/{$data['media_id']}", [
+        "media_id" => $data["media_id"],
+        "url" => $url,
+        "status" => "success"
     ]);
-
-    $response = curl_exec($ch);
-
-    if ($response === false) {
-        $error = curl_error($ch);
-        curl_close($ch);
-        throw new \Exception("Erro ao enviar PATCH: " . $error);
-    }
-
-    curl_close($ch);
 };
 
 $channel->basic_consume(

@@ -1,8 +1,10 @@
 <?php
 
 use App\DiscordBot\Commands\DownloadCommand;
+use App\DiscordBot\Http\ExternalApiClient;
 use App\DiscordBot\Media\Download;
 use App\DiscordBot\Queue\Singleton\AmqpConnection;
+use App\DiscordBot\Storage\S3Uploader;
 use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
 use Discord\Builders\MessageBuilder;
@@ -25,9 +27,10 @@ $discord = new Discord([
 ]);
 
 $youtubeDl = new Download();
-$s3 = new S3Client($config["aws"]);
+$s3Uploader = new S3Uploader(new S3Client($config["aws"]), $_ENV['AWS_BUCKET']);
+$apiClient = new ExternalApiClient($_ENV['EXTERNAL_API_DOMAIN'], $_ENV['EXTERNAL_API_TOKEN']);
 
-$discord->on('ready', function(Discord $discord) use($youtubeDl, $s3) {
+$discord->on('ready', function(Discord $discord) use($youtubeDl, $s3Uploader, $apiClient) {
     $ampqConnection = AmqpConnection::getInstance();
 
     $channel = $ampqConnection->channel();
@@ -40,7 +43,7 @@ $discord->on('ready', function(Discord $discord) use($youtubeDl, $s3) {
         false
     );
 
-    $callback = function (AMQPMessage $message) use ($discord, $youtubeDl, $s3) {
+    $callback = function (AMQPMessage $message) use ($discord, $youtubeDl, $s3Uploader, $apiClient) {
         $data = json_decode($message->getBody(),true);
 
         if(!$data || ! isset($data['channel_id'], $data['download_url'])) {
@@ -66,34 +69,18 @@ $discord->on('ready', function(Discord $discord) use($youtubeDl, $s3) {
         }
 
         try {
-            $s3->putObject([
-                "Bucket" => $_ENV['AWS_BUCKET'],
-                "Key" => $key,
-                "Body" => fopen($file["path"], "rb"),
-                "ACL" => "public-read",
-            ]);
+            $s3Uploader->upload($key, $file["path"]);
         } catch (S3Exception $exception) {
             $message->ack();
             unlink($file["path"]);
             $discordChannel->sendMessage("❌ Ocorreu um erro ao realizar o seu download: <@{$data['author_id']}>");
-                /*->then(function() use ($message, $file) {
-                    $message->ack();
-                    unlink($file["path"]);
-                });*/
             return;
         }
 
-        $cmd = $s3->getCommand('GetObject', [
-            "Bucket" => $_ENV['AWS_BUCKET'],
-            "Key" => $key,
-        ]);
-
-        $request = $s3->createPresignedRequest($cmd, '+30 minutes');
-
-        $url = (string) $request->getUri();
+        $url = $s3Uploader->getPresignedUrl($key);
 
         if($file["size"] / 1000 > 8000) {
-            $discordChannel->sendMessage("✅ Download concluído: <@{$data['author_id']}>! Aqui está seu link (válido por 30 min):\n{$url}")
+            $discordChannel->sendMessage("✅ Download concluído: <@{$data['author_id']}>! Aqui está seu link (válido por 30 min):\n{$url}")
                 ->then(function() use ($message, $file) {
                     $message->ack();
                     unlink($file["path"]);
@@ -106,43 +93,16 @@ $discord->on('ready', function(Discord $discord) use($youtubeDl, $s3) {
             MessageBuilder::new()
                 ->setContent("Download concluído <@{$data['author_id']}>")
                 ->addFile($file["path"], basename($file["path"]))
-        )->then(function() use ($file, $message, $request, $data) {
+        )->then(function() use ($file, $message, $url, $data, $apiClient) {
             $message->ack();
             unlink($file["path"]);
 
-            $url = (string) $request->getUri();
-            $endpoint = $_ENV["EXTERNAL_API_DOMAIN"] . "/api/discord/media";
-
-            $payload = json_encode([
+            $apiClient->post("/api/discord/media", [
                 "user_discord_id" => $data["author_id"],
                 "s3Url" => $url,
                 "media_format" => $data["format"],
                 "original_url" => $data['download_url'],
             ]);
-
-            $ch = curl_init($endpoint);
-
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-type: application/json",
-                "Content-Length: " . strlen($payload),
-                "Authorization: Bearer " . $_ENV['EXTERNAL_API_TOKEN']
-            ]);
-
-            $response = curl_exec($ch);
-
-            if ($response === false) {
-                $error = curl_error($ch);
-                curl_close($ch);
-                throw new \Exception("Erro ao enviar PATCH: " . $error);
-            }
-
-            curl_close($ch);
-
         });
     };
 
