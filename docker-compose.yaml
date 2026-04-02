@@ -16,4 +16,4 @@ services:
 
 networks:
   my-shared-network:
-    driver: bridge
+    external: true
